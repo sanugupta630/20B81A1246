@@ -1,1 +1,44 @@
+const express = require('express');
+const axios = require('axios');
+
+const app = express();
+const port = process.env.PORT || 8008;
+
+app.get('/numbers', async (req, res) => {
+  const urls = req.query.url;
+
+  if (!urls) {
+    return res.status(400).json({ error: 'No URLs provided' });
+  }
+
+  const start = Date.now();
+
+  try {
+    const promises = urls.map(async url => {
+      try {
+        const response = await axios.get(url, { timeout: 500 });
+        return response.data.numbers || [];
+      } catch (error) {
+        return [];
+      }
+    });
+
+    const results = await Promise.all(promises);
+    const allNumbers = results.flat();
+
+    // Deduplicate and sort numbers in ascending order
+    const sortedNumbers = Array.from(new Set(allNumbers)).sort((a, b) => a - b);
+
+    const responseTime = Date.now() - start;
+    res.json({ numbers: sortedNumbers, responseTime });
+  } catch (error) {
+    console.error('Error fetching numbers:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+
 
