@@ -2,7 +2,7 @@ const express = require('express');
 const axios = require('axios');
 
 
-const API_BASE_URL = 'https://api.johndoe-railways.com'; // Replace with actual API URL
+const URL = 'https://api.johndoe-railways.com'; 
 
 async function getApiToken() {
   try {
@@ -32,7 +32,7 @@ app.get('/trains', async (req, res) => {
     const now = new Date();
     const next12Hours = new Date(now.getTime() + 12 * 60 * 60 * 1000);
 
-    const response = await axios.get(`${API_BASE_URL}/trains`, {
+    const response = await axios.get(`${URL}/trains`, {
       headers: {
         Authorization: 'Bearer YOUR_ACCESS_TOKEN' // Replace with actual token
       }
