@@ -1,1 +1,83 @@
+const express = require('express');
+const axios = require('axios');
 
+
+const API_BASE_URL = 'https://api.johndoe-railways.com'; // Replace with actual API URL
+
+async function getApiToken() {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/train/register`, {
+      accessCode: 'YOUR_ACCESS_CODE' // Replace with your access code
+    });
+
+    const apiToken = response.data.apiToken;
+    return apiToken;
+  } catch (error) {
+    console.error('Error obtaining API token:', error.message);
+    throw error;
+  }
+}
+
+(async () => {
+  const apiToken = await getApiToken();
+  console.log('API Token:', apiToken);
+})();
+
+const app = express();
+const port = process.env.PORT || 8008;
+
+
+app.get('/trains', async (req, res) => {
+  try {
+    const now = new Date();
+    const next12Hours = new Date(now.getTime() + 12 * 60 * 60 * 1000);
+
+    const response = await axios.get(`${API_BASE_URL}/trains`, {
+      headers: {
+        Authorization: 'Bearer YOUR_ACCESS_TOKEN' // Replace with actual token
+      }
+    });
+
+    const filteredTrains = response.data.trains.filter(train => {
+      const departureTime = new Date(train.departureTime);
+      const delayMinutes = train.delayMinutes || 0;
+      return departureTime > now && departureTime <= next12Hours && delayMinutes >= 30;
+    });
+
+    // Fetch seat availability and pricing for each train
+    const trainsWithDetails = await Promise.all(
+      filteredTrains.map(async train => {
+        const availabilityResponse = await axios.get(`${API_BASE_URL}/trains/${train.id}/availability`);
+        train.sleeper = {
+          seatsAvailable: availabilityResponse.data.sleeper.seats,
+          price: availabilityResponse.data.sleeper.price
+        };
+        train.ac = {
+          seatsAvailable: availabilityResponse.data.ac.seats,
+          price: availabilityResponse.data.ac.price
+        };
+        return train;
+      })
+    );
+
+    // Sort trains based on the specified criteria
+    trainsWithDetails.sort((a, b) => {
+      if (a.ac.price === b.ac.price) {
+        if (a.sleeper.seatsAvailable === b.sleeper.seatsAvailable) {
+          return new Date(a.departureTime) - new Date(b.departureTime);
+        }
+        return b.sleeper.seatsAvailable - a.sleeper.seatsAvailable;
+      }
+      return a.ac.price - b.ac.price;
+    });
+
+    res.json({ trains: trainsWithDetails });
+  } catch (error) {
+    console.error('Error fetching train schedules:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
